@@ -1,3 +1,4 @@
+console.log("🚀 NEW CODE IS RUNNING");
 const { Client, GatewayIntentBits } = require("discord.js");
 
 const client = new Client({
