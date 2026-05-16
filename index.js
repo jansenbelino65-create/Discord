@@ -22,7 +22,7 @@ async function askGroq(prompt) {
     body: JSON.stringify({
       model: "llama3-8b-8192",
       messages: [
-        { role: "system", content: "You are a helpful Discord AI. Be short and friendly." },
+        { role: "system", content: "You are a helpful Discord AI assistant. Keep replies short." },
         { role: "user", content: prompt }
       ]
     })
@@ -30,9 +30,11 @@ async function askGroq(prompt) {
 
   const data = await res.json();
 
+  // DEBUG (this is important for future fixes)
+  console.log("GROQ RAW RESPONSE:", JSON.stringify(data, null, 2));
+
   if (!res.ok) {
-    console.error("Groq error:", data);
-    return "AI error.";
+    return `Groq API Error: ${data.error?.message || "Unknown error"}`;
   }
 
   return data.choices?.[0]?.message?.content || "No response.";
@@ -41,7 +43,6 @@ async function askGroq(prompt) {
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
-  // ONLY respond if mentioned or replied to bot
   const isMentioned = message.mentions.users.has(client.user.id);
 
   let isReplyToBot = false;
@@ -54,6 +55,7 @@ client.on("messageCreate", async (message) => {
     } catch {}
   }
 
+  // ONLY respond if mentioned or replied to bot
   if (!isMentioned && !isReplyToBot) return;
 
   try {
@@ -61,6 +63,7 @@ client.on("messageCreate", async (message) => {
     await message.reply(reply);
   } catch (err) {
     console.error("Reply error:", err);
+    message.reply("AI error.");
   }
 });
 
