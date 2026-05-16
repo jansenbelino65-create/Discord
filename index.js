@@ -8,11 +8,14 @@ const client = new Client({
   ]
 });
 
+// Store conversations
+const conversations = new Map();
+
 client.once("ready", () => {
   console.log(`Bot online as ${client.user.tag}`);
 });
 
-async function askGroq(prompt) {
+async function askGroq(messages) {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -21,16 +24,7 @@ async function askGroq(prompt) {
     },
     body: JSON.stringify({
       model: "llama-3.1-8b-instant",
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful Discord AI assistant. Keep replies short and friendly."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ]
+      messages
     })
   });
 
@@ -51,9 +45,11 @@ client.on("messageCreate", async (message) => {
   const isMentioned = message.mentions.users.has(client.user.id);
 
   let isReplyToBot = false;
+
   if (message.reference) {
     try {
       const ref = await message.fetchReference();
+
       if (ref.author.id === client.user.id) {
         isReplyToBot = true;
       }
@@ -62,9 +58,43 @@ client.on("messageCreate", async (message) => {
 
   if (!isMentioned && !isReplyToBot) return;
 
+  const userId = message.author.id;
+
+  // Create memory if user doesn't exist
+  if (!conversations.has(userId)) {
+    conversations.set(userId, [
+      {
+        role: "system",
+        content:
+          "You are a helpful Discord AI assistant. Remember the user's name and continue conversations naturally."
+      }
+    ]);
+  }
+
+  const history = conversations.get(userId);
+
+  // Add user message
+  history.push({
+    role: "user",
+    content: `${message.author.username}: ${message.content}`
+  });
+
+  // Keep memory from getting too huge
+  if (history.length > 20) {
+    history.splice(1, history.length - 20);
+  }
+
   try {
-    const reply = await askGroq(message.content);
+    const reply = await askGroq(history);
+
+    // Save AI reply
+    history.push({
+      role: "assistant",
+      content: reply
+    });
+
     await message.reply(reply);
+
   } catch (err) {
     console.error("Reply error:", err);
     message.reply("AI error.");
