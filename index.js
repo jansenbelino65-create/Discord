@@ -20,18 +20,23 @@ async function askGroq(prompt) {
       "Authorization": `Bearer ${process.env.GROQ_API_KEY}`
     },
     body: JSON.stringify({
-      model: "llama3-8b-8192",
+      model: "llama-3.1-8b-instant",
       messages: [
-        { role: "system", content: "You are a helpful Discord AI assistant. Keep replies short." },
-        { role: "user", content: prompt }
+        {
+          role: "system",
+          content: "You are a helpful Discord AI assistant. Keep replies short and friendly."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
       ]
     })
   });
 
   const data = await res.json();
 
-  // DEBUG (this is important for future fixes)
-  console.log("GROQ RAW RESPONSE:", JSON.stringify(data, null, 2));
+  console.log("GROQ RESPONSE:", JSON.stringify(data, null, 2));
 
   if (!res.ok) {
     return `Groq API Error: ${data.error?.message || "Unknown error"}`;
@@ -55,7 +60,6 @@ client.on("messageCreate", async (message) => {
     } catch {}
   }
 
-  // ONLY respond if mentioned or replied to bot
   if (!isMentioned && !isReplyToBot) return;
 
   try {
