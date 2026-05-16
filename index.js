@@ -9,14 +9,16 @@ const client = new Client({
 });
 
 client.once("ready", () => {
-  console.log(`Logged in as ${client.user.tag}`);
+  console.log("Bot is online");
 });
 
 client.on("messageCreate", (message) => {
   if (message.author.bot) return;
 
+  // ONLY reply when bot is tagged
+  if (!message.mentions.has(client.user)) return;
+
   message.reply("I am online 🤖");
 });
 
-// IMPORTANT: token comes from Railway / environment variable
 client.login(process.env.DISCORD_TOKEN);
