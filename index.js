@@ -1,4 +1,5 @@
 const { Client, GatewayIntentBits } = require("discord.js");
+const { generateReply } = require("./openai"); // your AI file
 
 const client = new Client({
   intents: [
@@ -12,13 +13,20 @@ client.once("ready", () => {
   console.log("Bot is online");
 });
 
-client.on("messageCreate", (message) => {
+client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
-  // ONLY reply when bot is tagged
-  if (!message.mentions.has(client.user)) return;
+  try {
+    const reply = await generateReply(
+      [],
+      message.content
+    );
 
-  message.reply("I am online 🤖");
+    message.reply(reply);
+  } catch (err) {
+    console.error(err);
+    message.reply("Sorry, something went wrong.");
+  }
 });
 
 client.login(process.env.DISCORD_TOKEN);
