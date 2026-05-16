@@ -1,4 +1,3 @@
-console.log("🚀 NEW CODE IS RUNNING");
 const { Client, GatewayIntentBits } = require("discord.js");
 
 const client = new Client({
@@ -10,13 +9,18 @@ const client = new Client({
 });
 
 client.once("ready", () => {
-  console.log("READY EVENT FIRED");
+  console.log("BOT ONLINE");
 });
 
-client.on("messageCreate", (message) => {
-  console.log("MESSAGE EVENT FIRED:", message.content);
-});
+client.on("messageCreate", async (message) => {
+  console.log("GOT MESSAGE");
 
-console.log("SCRIPT STARTED");
+  try {
+    const sent = await message.channel.send("✅ BOT CAN SEND MESSAGES");
+    console.log("MESSAGE SENT:", sent.content);
+  } catch (err) {
+    console.error("SEND ERROR:", err);
+  }
+});
 
 client.login(process.env.DISCORD_TOKEN);
