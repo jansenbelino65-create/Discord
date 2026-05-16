@@ -1,5 +1,5 @@
 const { Client, GatewayIntentBits } = require("discord.js");
-const { generateReply } = require("./openai"); // your AI file
+const OpenAI = require("openai");
 
 const client = new Client({
   intents: [
@@ -9,23 +9,39 @@ const client = new Client({
   ]
 });
 
+// OpenAI setup
+const ai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
 client.once("ready", () => {
-  console.log("Bot is online");
+  console.log(`Bot is online as ${client.user.tag}`);
 });
 
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
   try {
-    const reply = await generateReply(
-      [],
-      message.content
-    );
+    const response = await ai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are a friendly Discord AI bot. Keep replies short and helpful."
+        },
+        {
+          role: "user",
+          content: message.content
+        }
+      ]
+    });
 
+    const reply = response.choices[0].message.content;
     message.reply(reply);
+
   } catch (err) {
-    console.error(err);
-    message.reply("Sorry, something went wrong.");
+    console.error("AI error:", err);
+    message.reply("AI is currently having trouble.");
   }
 });
 
