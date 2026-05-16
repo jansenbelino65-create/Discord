@@ -9,17 +9,58 @@ const client = new Client({
 });
 
 client.once("ready", () => {
-  console.log("BOT ONLINE");
+  console.log(`Bot online as ${client.user.tag}`);
 });
 
+async function askGroq(prompt) {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${process.env.GROQ_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: "llama3-8b-8192",
+      messages: [
+        { role: "system", content: "You are a helpful Discord AI. Be short and friendly." },
+        { role: "user", content: prompt }
+      ]
+    })
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    console.error("Groq error:", data);
+    return "AI error.";
+  }
+
+  return data.choices?.[0]?.message?.content || "No response.";
+}
+
 client.on("messageCreate", async (message) => {
-  console.log("GOT MESSAGE");
+  if (message.author.bot) return;
+
+  // ONLY respond if mentioned or replied to bot
+  const isMentioned = message.mentions.users.has(client.user.id);
+
+  let isReplyToBot = false;
+  if (message.reference) {
+    try {
+      const ref = await message.fetchReference();
+      if (ref.author.id === client.user.id) {
+        isReplyToBot = true;
+      }
+    } catch {}
+  }
+
+  if (!isMentioned && !isReplyToBot) return;
 
   try {
-    const sent = await message.channel.send("✅ BOT CAN SEND MESSAGES");
-    console.log("MESSAGE SENT:", sent.content);
+    const reply = await askGroq(message.content);
+    await message.reply(reply);
   } catch (err) {
-    console.error("SEND ERROR:", err);
+    console.error("Reply error:", err);
   }
 });
 
