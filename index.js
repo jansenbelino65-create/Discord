@@ -8,12 +8,30 @@ const client = new Client({
   ]
 });
 
-// Store conversations
+// Temporary conversations
 const conversations = new Map();
+
+// Forget conversations after 1 hour
+const MEMORY_TIMEOUT = 1000 * 60 * 60;
 
 client.once("ready", () => {
   console.log(`Bot online as ${client.user.tag}`);
 });
+
+// Detect topic resets
+function isNewTopic(message) {
+  const keywords = [
+    "new topic",
+    "anyway",
+    "different question",
+    "another question",
+    "off topic"
+  ];
+
+  return keywords.some(word =>
+    message.toLowerCase().includes(word)
+  );
+}
 
 async function askGroq(messages) {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -30,10 +48,9 @@ async function askGroq(messages) {
 
   const data = await res.json();
 
-  console.log("GROQ RESPONSE:", JSON.stringify(data, null, 2));
-
   if (!res.ok) {
-    return `Groq API Error: ${data.error?.message || "Unknown error"}`;
+    console.error("Groq Error:", data);
+    return "AI error.";
   }
 
   return data.choices?.[0]?.message?.content || "No response.";
@@ -56,39 +73,68 @@ client.on("messageCreate", async (message) => {
     } catch {}
   }
 
+  // Only respond if tagged or replied to
   if (!isMentioned && !isReplyToBot) return;
 
-  const userId = message.author.id;
+  // Memory only for:
+  // server + channel + user
+  const memoryKey =
+    `${message.guild?.id || "dm"}-${message.channel.id}-${message.author.id}`;
 
-  // Create memory if user doesn't exist
-  if (!conversations.has(userId)) {
-    conversations.set(userId, [
+  const now = Date.now();
+
+  // Forget after timeout
+  if (
+    conversations.has(memoryKey) &&
+    now - conversations.get(memoryKey).lastUsed > MEMORY_TIMEOUT
+  ) {
+    conversations.delete(memoryKey);
+  }
+
+  // Create fresh conversation
+  if (!conversations.has(memoryKey)) {
+    conversations.set(memoryKey, {
+      lastUsed: now,
+      history: [
+        {
+          role: "system",
+          content:
+            "You are a helpful AI assistant similar to ChatGPT. Be friendly, direct, natural, and concise. Do not pretend to know personal information unless the user directly said it in the current conversation. Stay on-topic and avoid unnecessary roleplay."
+        }
+      ]
+    });
+  }
+
+  const convo = conversations.get(memoryKey);
+
+  convo.lastUsed = now;
+
+  // Reset on topic change
+  if (isNewTopic(message.content)) {
+    convo.history = [
       {
         role: "system",
         content:
-          "You are a helpful Discord AI assistant. Remember the user's name and continue conversations naturally."
+          "You are a helpful AI assistant similar to ChatGPT. Be friendly, direct, natural, and concise."
       }
-    ]);
+    ];
   }
 
-  const history = conversations.get(userId);
-
-  // Add user message
-  history.push({
+  // Add ONLY the message content
+  convo.history.push({
     role: "user",
-    content: `${message.author.username}: ${message.content}`
+    content: message.content
   });
 
-  // Keep memory from getting too huge
-  if (history.length > 20) {
-    history.splice(1, history.length - 20);
+  // Keep memory small and focused
+  if (convo.history.length > 10) {
+    convo.history.splice(1, convo.history.length - 10);
   }
 
   try {
-    const reply = await askGroq(history);
+    const reply = await askGroq(convo.history);
 
-    // Save AI reply
-    history.push({
+    convo.history.push({
       role: "assistant",
       content: reply
     });
@@ -96,7 +142,7 @@ client.on("messageCreate", async (message) => {
     await message.reply(reply);
 
   } catch (err) {
-    console.error("Reply error:", err);
+    console.error("Reply Error:", err);
     message.reply("AI error.");
   }
 });
